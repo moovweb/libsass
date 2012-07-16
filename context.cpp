@@ -2,6 +2,7 @@
 #include <iostream>
 #include <unistd.h>
 #include "prelexer.hpp"
+#include "color_names.hpp"
 using std::cerr; using std::endl;
 
 namespace Sass {
@@ -42,17 +43,20 @@ namespace Sass {
   
   Context::Context(const char* paths_str)
   : global_env(Environment()),
-    function_env(map<pair<string, size_t>, Function>()),
+    function_env(map<string, Function>()),
     extensions(multimap<Node, Node>()),
     pending_extensions(vector<pair<Node, Node> >()),
     source_refs(vector<char*>()),
     include_paths(vector<string>()),
+    color_names_to_values(map<string, Node>()),
+    color_values_to_names(map<Node, string>()),
     new_Node(Node_Factory()),
     ref_count(0),
     has_extensions(false)
   {
     register_functions();
     collect_include_paths(paths_str);
+    setup_color_map();
   }
   
   Context::~Context()
@@ -60,21 +64,27 @@ namespace Sass {
     for (size_t i = 0; i < source_refs.size(); ++i) {
       delete[] source_refs[i];
     }
-
     new_Node.free();
     // cerr << "Deallocated " << i << " source string(s)." << endl;
   }
   
   inline void Context::register_function(Function_Descriptor d, Primitive ip)
   {
-    Function f(d, ip);
-    function_env[pair<string, size_t>(f.name, f.parameters.size())] = f;
+    Function f(d, ip, new_Node);
+    // function_env[pair<string, size_t>(f.name, f.parameters.size())] = f;
+    function_env[f.name] = f;
   }
   
   inline void Context::register_function(Function_Descriptor d, Primitive ip, size_t arity)
   {
-    Function f(d, ip);
-    function_env[pair<string, size_t>(f.name, arity)] = f;
+    Function f(d, ip, new_Node);
+    // function_env[pair<string, size_t>(f.name, arity)] = f;
+    function_env[f.name] = f;
+  }
+
+  inline void Context::register_overload_stub(string name)
+  {
+    function_env[name] = Function(name, true);
   }
   
   void Context::register_functions()
@@ -82,11 +92,13 @@ namespace Sass {
     using namespace Functions;
     // RGB Functions
     register_function(rgb_descriptor,  rgb);
+    register_overload_stub("rgba");
     register_function(rgba_4_descriptor, rgba_4);
     register_function(rgba_2_descriptor, rgba_2);
     register_function(red_descriptor, red);
     register_function(green_descriptor, green);
     register_function(blue_descriptor, blue);
+    register_overload_stub("mix");
     register_function(mix_2_descriptor, mix_2);
     register_function(mix_3_descriptor, mix_3);
     // HSL Functions
@@ -112,10 +124,13 @@ namespace Sass {
     // List Functions
     register_function(length_descriptor, length);
     register_function(nth_descriptor, nth);
+    register_overload_stub("join");
     register_function(join_2_descriptor, join_2);
     register_function(join_3_descriptor, join_3);
+    register_overload_stub("append");
     register_function(append_2_descriptor, append_2);
     register_function(append_3_descriptor, append_3);
+    register_overload_stub("compact");
     register_function(compact_1_descriptor, compact);
     register_function(compact_2_descriptor, compact);
     register_function(compact_3_descriptor, compact);
@@ -126,6 +141,8 @@ namespace Sass {
     register_function(compact_8_descriptor, compact);
     register_function(compact_9_descriptor, compact);
     register_function(compact_10_descriptor, compact);
+    register_function(compact_11_descriptor, compact);
+    register_function(compact_12_descriptor, compact);
     // Introspection Functions
     register_function(type_of_descriptor, type_of);
     register_function(unit_descriptor, unit);
@@ -133,6 +150,22 @@ namespace Sass {
     register_function(comparable_descriptor, comparable);
     // Boolean Functions
     register_function(not_descriptor, not_impl);
+  }
+
+  void Context::setup_color_map()
+  {
+    size_t i = 0;
+    while (color_names[i]) {
+      string name(color_names[i]);
+      Node value(new_Node("[COLOR TABLE]", 0,
+                          color_values[i*3],
+                          color_values[i*3+1],
+                          color_values[i*3+2],
+                          1));
+      color_names_to_values[name] = value;
+      color_values_to_names[value] = name;
+      ++i;
+    }
   }
   
 }

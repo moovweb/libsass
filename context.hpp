@@ -42,11 +42,13 @@ namespace Sass {
 
   struct Context {
     Environment global_env;
-    map<pair<string, size_t>, Function> function_env;
+    map<string, Function> function_env;
     multimap<Node, Node> extensions;
     vector<pair<Node, Node> > pending_extensions;
     vector<char*> source_refs; // all the source c-strings
     vector<string> include_paths;
+    map<string, Node> color_names_to_values;
+    map<Node, string> color_values_to_names;
     Node_Factory new_Node;
     size_t ref_count;
     string sass_path;
@@ -59,7 +61,9 @@ namespace Sass {
     
     void register_function(Function_Descriptor d, Primitive ip);
     void register_function(Function_Descriptor d, Primitive ip, size_t arity);
+    void register_overload_stub(string name);
     void register_functions();
+    void setup_color_map();
   };
 
 }
