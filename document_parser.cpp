@@ -813,12 +813,24 @@ namespace Sass {
       const char* value = position;
       const char* rparen = find_first< exactly<')'> >(position);
       if (!rparen) throw_syntax_error("URI is missing ')'");
-      Token contents(Token::make(value, rparen));
+      Token content_tok(Token::make(value, rparen));
+      Node content_node(context.new_Node(Node::string_constant, path, line, content_tok));
       // lex< string_constant >();
-      Node result(context.new_Node(Node::uri, path, line, contents));
+      Node result(context.new_Node(Node::uri, path, line, 1));
+      result << content_node;
       position = rparen;
       lex< exactly<')'> >();
       return result;
+    }
+
+    if (lex< image_url_prefix >())
+    {
+      Node url(parse_value());
+      if (!lex< exactly<')'> >()) throw_syntax_error("call to image-url is missing ')'");
+      Node the_call(context.new_Node(Node::image_url, path, line, 1));
+      the_call << url;
+      the_call.should_eval() = true;
+      return the_call;
     }
 
     if (peek< functional >())

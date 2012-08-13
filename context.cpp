@@ -1,4 +1,5 @@
 #include "context.hpp"
+#include <cstring>
 #include <iostream>
 #include <unistd.h>
 #include "prelexer.hpp"
@@ -41,7 +42,7 @@ namespace Sass {
     // }
   }
   
-  Context::Context(const char* paths_str)
+  Context::Context(const char* paths_str, const char* img_path_str)
   : global_env(Environment()),
     function_env(map<string, Function>()),
     extensions(multimap<Node, Node>()),
@@ -51,12 +52,18 @@ namespace Sass {
     color_names_to_values(map<string, Node>()),
     color_values_to_names(map<Node, string>()),
     new_Node(Node_Factory()),
+    image_path(0),
     ref_count(0),
     has_extensions(false)
   {
     register_functions();
     collect_include_paths(paths_str);
     setup_color_map();
+
+    string path_string(img_path_str);
+    path_string = "'" + path_string + "/'";
+    image_path = new char[path_string.length() + 1];
+    std::strcpy(image_path, path_string.c_str());
   }
   
   Context::~Context()
@@ -64,6 +71,7 @@ namespace Sass {
     for (size_t i = 0; i < source_refs.size(); ++i) {
       delete[] source_refs[i];
     }
+    delete[] image_path;
     new_Node.free();
     // cerr << "Deallocated " << i << " source string(s)." << endl;
   }
