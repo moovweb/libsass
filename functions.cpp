@@ -847,10 +847,6 @@ namespace Sass {
     extern Signature nth_sig = "nth($list, $n)";
     Node nth(const Node parameter_names, Environment& bindings, Node_Factory& new_Node, string& path, size_t line) {
       Node l(bindings[parameter_names[0].token()]);
-      Node n(bindings[parameter_names[1].token()]);
-      if (n.type() != Node::number) {
-        throw_eval_error("second argument to nth must be a number", path, line);
-      }
       if (l.type() == Node::nil) {
         throw_eval_error("cannot index into an empty list", path, line);
       }
@@ -858,11 +854,9 @@ namespace Sass {
       if (l.type() != Node::space_list && l.type() != Node::comma_list) {
         l = new_Node(Node::space_list, path, line, 1) << l;
       }
-      double n_prim = n.numeric_value();
-      if (n_prim < 1 || n_prim > l.size()) {
-        throw_eval_error("out of range index for nth", path, line);
-      }
-      return l[n_prim - 1];
+      // just truncate the index if it's not an integer ... more permissive than Ruby Sass
+      size_t n = std::floor(arg(nth_sig, path, line, parameter_names, bindings, 1, 1, l.size()).numeric_value());
+      return l[n - 1];
     }
 
     extern Signature join_sig = "join($list1, $list2, $separator: auto)";
@@ -884,17 +878,18 @@ namespace Sass {
       size_t size = 0;
       if (l1.type() != Node::nil) size += l1.size();
       if (l2.type() != Node::nil) size += l2.size();
+ 
       // figure out the result type in advance
       Node::Type rtype = Node::space_list;
-
       string sep(bindings[parameter_names[2].token()].token().unquote());
       if (sep == "comma")      rtype = Node::comma_list;
       else if (sep == "space") rtype = Node::space_list;
       else if (sep == "auto")  rtype = l1.type();
       else {
-        throw_eval_error("third argument to join must be 'space', 'comma', or 'auto'", path, line);
+        throw_eval_error("third argument to 'join' must be 'space', 'comma', or 'auto'", path, line);
       }
       if (rtype == Node::nil) rtype = l2.type();
+ 
       // accumulate the result
       Node lr(new_Node(rtype, path, line, size));
       if (l1.type() != Node::nil) lr += l1;
@@ -923,7 +918,7 @@ namespace Sass {
       if (sep_string == "comma")      sep_type = Node::comma_list;
       else if (sep_string == "space") sep_type = Node::space_list;
       else if (sep_string == "auto")  sep_type = list.type();
-      else throw_eval_error("third argument to append must be 'space', 'comma', or 'auto'", path, line);
+      else throw_eval_error("third argument to 'append' must be 'space', 'comma', or 'auto'", path, line);
 
       Node new_list(new_Node(sep_type, path, line, list.size() + 1));
       new_list += list;
@@ -1003,7 +998,7 @@ namespace Sass {
 
     extern Signature unit_sig = "unit($number)";
     Node unit(const Node parameter_names, Environment& bindings, Node_Factory& new_Node, string& path, size_t line) {
-      Node val(bindings[parameter_names[0].token()]);
+      Node val(arg(unit_sig, path, line, parameter_names, bindings, 0, Node::numeric));
       switch (val.type())
       {
         case Node::number: {
@@ -1015,8 +1010,9 @@ namespace Sass {
           return new_Node(Node::string_constant, path, line, val.unit());
         } break;
 
+        // unreachable
         default: {
-          throw_eval_error("argument to unit must be numeric", path, line);
+          throw_eval_error("argument to 'unit' must be numeric", path, line);
         } break;
       }
       // unreachable statement
@@ -1025,7 +1021,7 @@ namespace Sass {
 
     extern Signature unitless_sig = "unitless($number)";
     Node unitless(const Node parameter_names, Environment& bindings, Node_Factory& new_Node, string& path, size_t line) {
-      Node val(bindings[parameter_names[0].token()]);
+      Node val(arg(unitless_sig, path, line, parameter_names, bindings, 0, Node::numeric));
       switch (val.type())
       {
         case Node::number: {
@@ -1037,8 +1033,9 @@ namespace Sass {
           return new_Node(Node::boolean, path, line, false);
         } break;
 
+        // unreachable
         default: {
-          throw_eval_error("argument to unitless must be numeric", path, line);
+          throw_eval_error("argument to 'unitless' must be numeric", path, line);
         } break;
       }
       // unreachable statement
@@ -1047,8 +1044,8 @@ namespace Sass {
     
     extern Signature comparable_sig = "comparable($number-1, $number-2)";
     Node comparable(const Node parameter_names, Environment& bindings, Node_Factory& new_Node, string& path, size_t line) {
-      Node n1(bindings[parameter_names[0].token()]);
-      Node n2(bindings[parameter_names[1].token()]);
+      Node n1(arg(comparable_sig, path, line, parameter_names, bindings, 0, Node::numeric));
+      Node n2(arg(comparable_sig, path, line, parameter_names, bindings, 1, Node::numeric));
       Node::Type t1 = n1.type();
       Node::Type t2 = n2.type();
       if ((t1 == Node::number && n2.is_numeric()) ||
@@ -1063,16 +1060,13 @@ namespace Sass {
         string u2(n2.unit().to_string());
         if ((u1 == "ex" && u2 == "ex") ||
             (u1 == "em" && u2 == "em") ||
-            ((u1 == "in" || u1 == "cm" || u1 == "mm" || u1 == "pt" || u1 == "pc") &&
-             (u2 == "in" || u2 == "cm" || u2 == "mm" || u2 == "pt" || u2 == "pc"))) {
+            ((u1 == "in" || u1 == "cm" || u1 == "mm" || u1 == "pt" || u1 == "pc" || u1 == "px") &&
+             (u2 == "in" || u2 == "cm" || u2 == "mm" || u2 == "pt" || u2 == "pc" || u2 == "px"))) {
           return new_Node(Node::boolean, path, line, true);
         }
         else {
           return new_Node(Node::boolean, path, line, false);
         }
-      }
-      else if (!n1.is_numeric() && !n2.is_numeric()) {
-        throw_eval_error("arguments to comparable must be numeric", path, line);
       }
       // default to false if we missed anything
       return new_Node(Node::boolean, path, line, false);
@@ -1085,12 +1079,8 @@ namespace Sass {
     extern Signature not_sig = "not($value)";
     Node not_impl(const Node parameter_names, Environment& bindings, Node_Factory& new_Node, string& path, size_t line) {
       Node val(bindings[parameter_names[0].token()]);
-      if (val.type() == Node::boolean && val.boolean_value() == false) {
-        return new_Node(Node::boolean, path, line, true);
-      }
-      else {
-        return new_Node(Node::boolean, path, line, false);
-      }
+      if (val.is_false()) return new_Node(Node::boolean, path, line, true);
+      return new_Node(Node::boolean, path, line, false);
     }
 
     extern Signature if_sig = "if($condition, $if-true, $if-false)";
@@ -1099,7 +1089,7 @@ namespace Sass {
       Node consequent(bindings[parameter_names[1].token()]);
       Node alternative(bindings[parameter_names[2].token()]);
 
-      if (predicate.type() == Node::boolean && predicate.boolean_value() == false) return alternative;
+      if (predicate.is_false()) return alternative;
       return consequent;
     }
 
