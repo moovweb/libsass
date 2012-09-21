@@ -1,5 +1,5 @@
 #!/bin/bash
-[ -z $CLIBS_HOME ] && [ ! -z $MOOV_HOME ] && export CLIBS_HOME=$MOOV_HOME/clibs
+[ -z $CLIBS_HOME ] && [ ! -z $MOOV_HOME ] && export CLIBS_HOME="$MOOV_HOME/clibs"
 if [ -z $CLIBS_HOME ]; then
 	echo "Please set CLIBS_HOME or MOOV_HOME before running this script."
 	exit 1
