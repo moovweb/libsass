@@ -7,7 +7,7 @@ fi
 [ ! -d $CLIBS_HOME ] && mkdir -p $CLIBS_HOME
 
 CLIBS_HOME=`echo "$CLIBS_HOME" | awk '{sub(/^C:/,"/c"); print}'`
-CLIBS_HOME=`echo "$CLIBS_HOME" | awk '{sub(/\\/,"/"); print}'`
+CLIBS_HOME=`echo "$CLIBS_HOME" | awk '{sub(/\\\/,"/"); print}'`
 
 #make clean
 #git pull git://github.com/hcatlin/libsass.git
