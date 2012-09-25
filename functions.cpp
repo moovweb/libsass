@@ -1,22 +1,24 @@
-#ifndef SASS_PRELEXER
-#include "prelexer.hpp"
-#endif
-
-#include "node_factory.hpp"
-#include "functions.hpp"
-#include "context.hpp"
-#include "document.hpp"
-#include "eval_apply.hpp"
-#include "error.hpp"
-
 #include <iostream>
 #include <sstream>
 #include <cmath>
 #include <algorithm>
 
+#include "functions.hpp"
+#include "constants.hpp"
+#include "node_factory.hpp"
+#include "context.hpp"
+#include "document.hpp"
+#include "eval_apply.hpp"
+#include "error.hpp"
+
+#ifndef SASS_PRELEXER
+#include "prelexer.hpp"
+#endif
+
 using std::cerr; using std::endl; using std::stringstream;
 
 namespace Sass {
+  using namespace Constants;
 
   // this constructor needs context.hpp, so it can't be defined in functions.hpp
   // because including context.hpp in functions.hpp would be circular
@@ -45,20 +47,6 @@ namespace Sass {
 
   namespace Functions {
 
-    extern const char true_str[]  = "true";
-    extern const char false_str[] = "false";
-
-    extern const char empty_str[]   = "";
-    extern const char percent_str[] = "%";
-    extern const char deg_str[]     = "deg";
-
-    extern const char numeric_name[] = "numeric value";
-    extern const char number_name[] = "number";
-    extern const char string_name[] = "string";
-    extern const char bool_name[]   = "bool";
-    extern const char color_name[]  = "color";
-    extern const char list_name[]   = "list";
-
     static void throw_eval_error(string message, string& path, size_t line)
     {
       if (!path.empty() && Prelexer::string_constant(path.c_str()))
@@ -74,10 +62,16 @@ namespace Sass {
           return numeric_name;
         } break;
 
-        case Node::number:
-        case Node::numeric_percentage:
-        case Node::numeric_dimension: {
+        case Node::number: {
           return number_name;
+        } break;
+
+        case Node::numeric_percentage: {
+          return percentage_name;
+        } break;
+
+        case Node::numeric_dimension: {
+          return dimension_name;
         } break;
 
         case Node::string_t:
@@ -336,7 +330,7 @@ namespace Sass {
                                 rgb_color[1].numeric_value(),
                                 rgb_color[2].numeric_value(),
                                 new_Node, path, line));
-      return new_Node(path, line, hsl_color[0].numeric_value(), Token::make(deg_str));
+      return new_Node(path, line, hsl_color[0].numeric_value(), Token::make(deg_kwd));
     }
 
     extern Signature saturation_sig = "saturation($color)";
@@ -1008,35 +1002,31 @@ namespace Sass {
       return new_list;
     }
 
-    extern Signature compact_sig = "compact($arg1: false, $arg2: false, $arg3: false, $arg4: false, $arg5: false, $arg6: false, $arg7: false, $arg8: false, $arg9: false, $arg10: false, $arg11: false, $arg12: false)";
-    Node compact(const Node parameter_names, Environment& bindings, Node_Factory& new_Node, string& path, size_t line) {
-      Node first_arg(bindings[parameter_names[0].token()]);
-      Node rest_args(new_Node(Node::comma_list, path, line, 0));
-      for (size_t i = 1, S = bindings.current_frame.size(); i < S; ++i) {
+    extern Signature compact_1_sig = "compact($arg1)";
+    Node compact_1(const Node parameter_names, Environment& bindings, Node_Factory& new_Node, string& path, size_t line) {
+      Node the_arg(bindings[parameter_names[0].token()]);
+
+      if (the_arg.type() == Node::comma_list || the_arg.type() == Node::space_list) {
+        Node non_nils(new_Node(the_arg.type(), path, line, 0));
+        for (size_t i = 0, S = the_arg.size(); i < S; ++i) {
+          Node elt(the_arg[i]);
+          if (!elt.is_false()) non_nils << new_Node(path, line, elt);
+        }
+        return non_nils.size() > 0 ? non_nils : new_Node(Node::nil, path, line, 0);
+      }
+
+      return new_Node(path, line, the_arg);
+    }
+
+    extern Signature compact_n_sig = "compact($arg1: false, $arg2: false, $arg3: false, $arg4: false, $arg5: false, $arg6: false, $arg7: false, $arg8: false, $arg9: false, $arg10: false, $arg11: false, $arg12: false)";
+    Node compact_n(const Node parameter_names, Environment& bindings, Node_Factory& new_Node, string& path, size_t line) {
+      Node non_nils(new_Node(Node::comma_list, path, line, 0));
+      for (size_t i = 0, S = bindings.current_frame.size(); i < S; ++i) {
         Node the_arg(bindings[parameter_names[i].token()]);
-        if (!the_arg.is_false()) rest_args << new_Node(path, line, the_arg);
+        if (!the_arg.is_false()) non_nils << new_Node(path, line, the_arg);
       }
-      if (rest_args.size() > 0) {
-        Node result(new_Node(Node::comma_list, path, line, rest_args.size() + (first_arg.is_false() ? 0 : 1)));
-        if (!first_arg.is_false()) result << new_Node(path, line, first_arg);
-        result += rest_args;
-        return result;
-      }
-      else {
-        Node::Type first_type = first_arg.type();
-        if (first_type == Node::space_list || first_type == Node::comma_list) {
-          Node result(new_Node(first_type, path, line, 0));
-          for (size_t i = 0, S = first_arg.size(); i < S; ++i) {
-            if (!first_arg[i].is_false()) result << new_Node(path, line, first_arg[i]);
-          }
-          return result;
-        }
-        else {
-          return new_Node(path, line, first_arg);
-        }
-      }
-      // unreachable
-      return Node();
+
+      return non_nils.size() > 0 ? non_nils : new_Node(Node::nil, path, line, 0);
     }
 
     ////////////////////////////////////////////////////////////////////////
@@ -1175,5 +1165,22 @@ namespace Sass {
       return consequent;
     }
 
+    ////////////////////////////////////////////////////////////////////////
+    // Path Functions //////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////////
+
+    extern Signature image_url_sig = "image-url($path, $only-path: false, $cache-buster: false)";
+    Node image_url(const Node parameter_names, Environment& bindings, Node_Factory& new_Node, string& path, size_t line) {
+      Node base_path(bindings[parameter_names[0].token()]);
+      bool only_path = !bindings[parameter_names[1].token()].is_false();
+      Node image_path_val(bindings[Token::make(image_path_var)]);
+
+      Node result(new_Node(Node::concatenation, path, line, 2));
+      result << image_path_val;
+      result << base_path;
+      if (!only_path) result = (new_Node(Node::uri, path, line, 1) << result);
+
+      return result;
+    }
   }
 }
