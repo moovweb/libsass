@@ -245,7 +245,7 @@ top_srcdir = @top_srcdir@
 ACLOCAL_AMFLAGS = -I m4
 lib_LTLIBRARIES = libsass.la
 libsass_la_SOURCES = context.cpp functions.cpp document.cpp \
-	document_parser.cpp eval_apply.cpp node.cpp \
+	constants.cpp document_parser.cpp eval_apply.cpp node.cpp \
 	node_factory.cpp node_emitters.cpp prelexer.cpp \
 	sass_interface.cpp
 
