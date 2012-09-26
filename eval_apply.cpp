@@ -230,15 +230,6 @@ namespace Sass {
           expr[i] = eval(expr[i], prefix, env, f_env, new_Node, ctx);
         }
         return reduce(expr, 1, expr[0], new_Node);
-        // Node acc(new_Node(Node::expression, expr.path(), expr.line(), 1));
-        // acc << eval(expr[0], prefix, env, f_env, new_Node, ctx);
-        // Node rhs(eval(expr[2], prefix, env, f_env, new_Node, ctx));
-        // accumulate(expr[1].type(), acc, rhs, new_Node);
-        // for (size_t i = 3, S = expr.size(); i < S; i += 2) {
-        //   Node rhs(eval(expr[i+1], prefix, env, f_env, new_Node, ctx));
-        //   accumulate(expr[i].type(), acc, rhs, new_Node);
-        // }
-        // return acc.size() == 1 ? acc[0] : acc;
       } break;
 
       case Node::term: {
@@ -247,15 +238,6 @@ namespace Sass {
             expr[i] = eval(expr[i], prefix, env, f_env, new_Node, ctx);
           }
           return reduce(expr, 1, expr[0], new_Node);
-          // Node acc(new_Node(Node::expression, expr.path(), expr.line(), 1));
-          // acc << eval(expr[0], prefix, env, f_env, new_Node, ctx);
-          // Node rhs(eval(expr[2], prefix, env, f_env, new_Node, ctx));
-          // accumulate(expr[1].type(), acc, rhs, new_Node);
-          // for (size_t i = 3, S = expr.size(); i < S; i += 2) {
-          //   Node rhs(eval(expr[i+1], prefix, env, f_env, new_Node, ctx));
-          //   accumulate(expr[i].type(), acc, rhs, new_Node);
-          // }
-          // return acc.size() == 1 ? acc[0] : acc;
         }
         else {
           return expr;
@@ -296,6 +278,14 @@ namespace Sass {
       
       case Node::variable: {
         if (!env.query(expr.token())) throw_eval_error("reference to unbound variable " + expr.token().to_string(), expr.path(), expr.line());
+
+        // cerr << "ACCESSING VARIABLE " << expr.token().to_string() << endl;
+
+        // cerr << endl << "*** ENV DUMP ***" << endl;
+        // env.print();
+        // cerr << "*** END ENV ***" << endl << endl;
+
+
         return env[expr.token()];
       } break;
 
@@ -471,7 +461,21 @@ namespace Sass {
       } break;
 
       case Node::warning: {
-        expr[0] = eval(expr[0], prefix, env, f_env, new_Node, ctx);
+        expr = new_Node(expr);
+        expr[0] = eval(expr[0], Node(), env, f_env, new_Node, ctx);
+
+        string prefix("WARNING: ");
+        string indent("         ");
+        Node contents(expr[0]);
+        string result(contents.to_string());
+        if (contents.type() == Node::string_constant || contents.type() == Node::string_schema) {
+          result = result.substr(1, result.size()-2); // unquote if it's a single string
+        }
+        // These cerrs aren't log lines! They're supposed to be here!
+        cerr << prefix << result << endl;
+        cerr << indent << "on line " << expr.line() << " of " << expr.path();
+        cerr << endl << endl;
+
         return expr;
       } break;
 
@@ -751,6 +755,7 @@ namespace Sass {
       bindings.link(env.global ? *env.global : env);
       // bind the arguments
       bind_arguments("function " + f.name, params, args, prefix, bindings, f_env, new_Node, ctx);
+      // TO DO: consider cloning the function body
       return function_eval(f.name, body, bindings, new_Node, ctx, true);
     }
   }
@@ -767,7 +772,7 @@ namespace Sass {
       switch (stm.type())
       {
         case Node::assignment: {
-          Node val(stm[1]);
+          Node val(new_Node(stm[1])); // clone the value because it might get mutated in place
           if (val.type() == Node::comma_list || val.type() == Node::space_list) {
             for (size_t i = 0, S = val.size(); i < S; ++i) {
               if (val[i].should_eval()) val[i] = eval(val[i], Node(), bindings, ctx.function_env, new_Node, ctx);
@@ -777,10 +782,14 @@ namespace Sass {
             val = eval(val, Node(), bindings, ctx.function_env, new_Node, ctx);
           }
           Node var(stm[0]);
+          // cerr << "ASSIGNMENT IN FUNCTION: " << var.to_string() << ": " << val.to_string() << endl;
           if (stm.is_guarded() && bindings.query(var.token())) continue;
           // If a binding exists (possibly upframe), then update it.
           // Otherwise, make a new one in the current frame.
           if (bindings.query(var.token())) {
+            // cerr << "MODIFYING EXISTING BINDING FOR " << var.token().to_string() << endl;
+            // cerr << "CURRENT VALUE: " << bindings[var.token()].to_string() << endl;
+            // cerr << "NEW VALUE: " << val.to_string() << endl;
             bindings[var.token()] = val;
           }
           else {
@@ -791,7 +800,8 @@ namespace Sass {
         case Node::if_directive: {
           for (size_t j = 0, S = stm.size(); j < S; j += 2) {
             if (stm[j].type() != Node::block) {
-              Node predicate_val(eval(stm[j], Node(), bindings, ctx.function_env, new_Node, ctx));
+              Node pred(new_Node(stm[j]));
+              Node predicate_val(eval(pred, Node(), bindings, ctx.function_env, new_Node, ctx));
               if ((predicate_val.type() != Node::boolean) || predicate_val.boolean_value()) {
                 Node v(function_eval(name, stm[j+1], bindings, new_Node, ctx));
                 if (v.is_null_ptr()) break;
@@ -810,8 +820,8 @@ namespace Sass {
         case Node::for_to_directive: {
           Node::Type for_type = stm.type();
           Node iter_var(stm[0]);
-          Node lower_bound(eval(stm[1], Node(), bindings, ctx.function_env, new_Node, ctx));
-          Node upper_bound(eval(stm[2], Node(), bindings, ctx.function_env, new_Node, ctx));
+          Node lower_bound(eval(new_Node(stm[1]), Node(), bindings, ctx.function_env, new_Node, ctx));
+          Node upper_bound(eval(new_Node(stm[2]), Node(), bindings, ctx.function_env, new_Node, ctx));
           Node for_body(stm[3]);
           Environment for_env; // re-use this env for each iteration
           for_env.link(bindings);
@@ -827,7 +837,7 @@ namespace Sass {
 
         case Node::each_directive: {
           Node iter_var(stm[0]);
-          Node list(eval(stm[1], Node(), bindings, ctx.function_env, new_Node, ctx));
+          Node list(eval(new_Node(stm[1]), Node(), bindings, ctx.function_env, new_Node, ctx));
           if (list.type() != Node::comma_list && list.type() != Node::space_list) {
             list = (new_Node(Node::space_list, list.path(), list.line(), 1) << list);
           }
@@ -836,14 +846,18 @@ namespace Sass {
           each_env.link(bindings);
           for (size_t j = 0, T = list.size(); j < T; ++j) {
             each_env.current_frame[iter_var.token()] = eval(list[j], Node(), bindings, ctx.function_env, new_Node, ctx);
+            // cerr << "EACH with " << iter_var.token().to_string() << ": " << each_env[iter_var.token()].to_string() << endl;
             Node v(function_eval(name, each_body, each_env, new_Node, ctx));
+            // cerr << endl << "*** ENV DUMP ***" << endl;
+            // each_env.print();
+            // cerr << "*** END ENV ***" << endl << endl;
             if (v.is_null_ptr()) continue;
             else return v;
           }
         } break;
 
         case Node::while_directive: {
-          Node pred_expr(stm[0]);
+          Node pred_expr(new_Node(stm[0]));
           Node while_body(stm[1]);
           Environment while_env; // re-use this env for each iteration
           while_env.link(bindings);
@@ -851,11 +865,28 @@ namespace Sass {
           while ((pred_val.type() != Node::boolean) || pred_val.boolean_value()) {
             Node v(function_eval(name, while_body, while_env, new_Node, ctx));
             if (v.is_null_ptr()) {
-              pred_val = eval(pred_expr, Node(), bindings, ctx.function_env, new_Node, ctx);
+              pred_val = eval(new_Node(stm[0]), Node(), bindings, ctx.function_env, new_Node, ctx);
               continue;
             }
             else return v;
           }
+        } break;
+
+        case Node::warning: {
+          stm = new_Node(stm);
+          stm[0] = eval(stm[0], Node(), bindings, ctx.function_env, new_Node, ctx);
+
+          string prefix("WARNING: ");
+          string indent("         ");
+          Node contents(stm[0]);
+          string result(contents.to_string());
+          if (contents.type() == Node::string_constant || contents.type() == Node::string_schema) {
+            result = result.substr(1, result.size()-2); // unquote if it's a single string
+          }
+          // These cerrs aren't log lines! They're supposed to be here!
+          cerr << prefix << result << endl;
+          cerr << indent << "on line " << stm.line() << " of " << stm.path();
+          cerr << endl << endl;
         } break;
 
         case Node::return_directive: {
