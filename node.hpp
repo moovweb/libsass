@@ -74,7 +74,6 @@ namespace Sass {
       any,
       numeric,  // number, numeric_percentage, or numeric_dimension
       string_t, // string_constant, identifier, concatenation, schemata
-      list,     // space_list or comma_list
       comment,
 
       root,
@@ -104,9 +103,7 @@ namespace Sass {
       rule,
       property,
 
-      nil,
-      comma_list,
-      space_list,
+      list,
 
       disjunction,
       conjunction,
@@ -153,12 +150,14 @@ namespace Sass {
       identifier_schema,
 
       css_import,
+      function,
       function_call,
       mixin,
-      function,
+      mixin_call,
       parameters,
-      expansion,
       arguments,
+
+      extend_directive,
 
       if_directive,
       for_through_directive,
@@ -180,8 +179,8 @@ namespace Sass {
     Node(Node_Impl* ip = 0);
 
     Type type() const;
+    Type type(Type);
 
-    bool is_none() const;
     bool has_children() const;
     bool has_statements() const;
     bool has_blocks() const;
@@ -189,14 +188,14 @@ namespace Sass {
     bool has_backref() const;
     bool from_variable() const;
     bool& should_eval() const;
-    bool& is_unquoted() const; // for strings
-    bool& is_quoted() const;   // for identifiers
+    bool& is_quoted() const;
     bool is_numeric() const;
     bool is_string() const; // for all string-like types
     bool is_schema() const; // for all interpolated data
     bool is_guarded() const;
     bool& has_been_extended() const;
     bool is_false() const;
+    bool& is_comma_separated() const;
 
     string& path() const;
     size_t line() const;
@@ -207,6 +206,7 @@ namespace Sass {
     Node& back() const;
     Node& operator[](size_t i) const;
     void  pop_back();
+    void  pop_all();
     Node& push_back(Node n);
     Node& push_front(Node n);
     Node& operator<<(Node n);
@@ -223,7 +223,7 @@ namespace Sass {
     Token  token() const;
     Token  unit() const;
 
-    bool is_null_ptr() const { return !ip_; }
+    bool is_null() const { return !ip_; }
     bool is(Node n) const { return ip_ == n.ip_; }
 
     void flatten();
@@ -269,9 +269,9 @@ namespace Sass {
     bool has_backref;
     bool from_variable;
     bool should_eval;
-    bool is_unquoted;
     bool is_quoted;
     bool has_been_extended;
+    bool is_comma_separated;
 
     Node_Impl()
     : /* value(value_t()),
@@ -286,9 +286,9 @@ namespace Sass {
       has_backref(false),
       from_variable(false),
       should_eval(false),
-      is_unquoted(false), // for strings
-      is_quoted(false),  // for identifiers -- yeah, it's hacky for now
-      has_been_extended(false)
+      is_quoted(false),
+      has_been_extended(false),
+      is_comma_separated(false)
     { }
     
     bool is_numeric()
@@ -372,7 +372,7 @@ namespace Sass {
         case Node::for_to_directive:
         case Node::each_directive:
         case Node::while_directive:
-        case Node::expansion: {
+        case Node::mixin_call: {
           has_expansions = true;
         } break;
 
@@ -404,7 +404,7 @@ namespace Sass {
         case Node::for_to_directive:
         case Node::each_directive:
         case Node::while_directive:
-        case Node::expansion: has_expansions = true; break;
+        case Node::mixin_call: has_expansions = true; break;
 
         case Node::backref:   has_backref    = true; break;
 
@@ -415,6 +415,9 @@ namespace Sass {
 
     void pop_back()
     { children.pop_back(); }
+
+    void pop_all()
+    { for (size_t i = 0, S = size(); i < S; ++i) pop_back(); }
 
     bool& boolean_value()
     { return value.boolean; }
@@ -433,8 +436,8 @@ namespace Sass {
   inline Node::Node(Node_Impl* ip) : ip_(ip) { }
 
   inline Node::Type Node::type() const    { return ip_->type; }
+  inline Node::Type Node::type(Type t)    { return ip_->type = t; }
 
-  inline bool Node::is_none() const        { return !ip_; }
   inline bool Node::has_children() const   { return ip_->has_children; }
   inline bool Node::has_statements() const { return ip_->has_statements; }
   inline bool Node::has_blocks() const     { return ip_->has_blocks; }
@@ -442,7 +445,6 @@ namespace Sass {
   inline bool Node::has_backref() const    { return ip_->has_backref; }
   inline bool Node::from_variable() const  { return ip_->from_variable; }
   inline bool& Node::should_eval() const   { return ip_->should_eval; }
-  inline bool& Node::is_unquoted() const   { return ip_->is_unquoted; }
   inline bool& Node::is_quoted() const     { return ip_->is_quoted; }
   inline bool Node::is_numeric() const     { return ip_->is_numeric(); }
   inline bool Node::is_string() const      { return ip_->is_string(); }
@@ -450,6 +452,7 @@ namespace Sass {
   inline bool Node::is_guarded() const     { return (type() == assignment) && (size() == 3); }
   inline bool& Node::has_been_extended() const { return ip_->has_been_extended; }
   inline bool Node::is_false() const       { return (type() == boolean) && (boolean_value() == false); }
+  inline bool& Node::is_comma_separated() const { return ip_->is_comma_separated; }
   
   inline string& Node::path() const  { return ip_->path; }
   inline size_t  Node::line() const  { return ip_->line; }
@@ -460,6 +463,7 @@ namespace Sass {
   inline Node& Node::back() const               { return ip_->back(); }
   inline Node& Node::operator[](size_t i) const { return at(i); }
   inline void  Node::pop_back()                 { ip_->pop_back(); }
+  inline void  Node::pop_all()                  { ip_->pop_all(); }
   inline Node& Node::push_back(Node n)
   {
     ip_->push_back(n);
