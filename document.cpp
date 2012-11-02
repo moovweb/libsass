@@ -1,3 +1,7 @@
+#ifdef _WIN32
+#define S_ISDIR(mode) (((mode) & S_IFMT) == S_IFDIR)
+#endif
+
 #include <cstdio>
 #include <cstring>
 #include "document.hpp"
@@ -82,7 +86,7 @@ namespace Sass {
     return doc;
   }
 
-  Document Document::make_from_source_chars(Context& ctx, char* src, string path, bool own_source)
+  Document Document::make_from_source_chars(Context& ctx, const char* src, string path, bool own_source)
   {
     Document doc(ctx);
     doc.path = path;
@@ -106,7 +110,7 @@ namespace Sass {
     doc.root = ctx.new_Node(Node::root, path, 1, 0);
     doc.lexed = Token::make();
     doc.own_source = false;
-    doc.source = const_cast<char*>(t.begin);
+    doc.source = t.begin;
     doc.end = t.end;
     doc.position = doc.source;
 
