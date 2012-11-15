@@ -45,13 +45,15 @@ extern "C" {
   static char* process_document(Sass::Document& doc, int style)
   {
     using namespace Sass;
+    Backtrace root_trace(0, "", 0, "");
     doc.parse_scss();
     expand(doc.root,
            Node(),
            doc.context.global_env,
            doc.context.function_env,
            doc.context.new_Node,
-           doc.context);
+           doc.context,
+           root_trace);
     // extend_selectors(doc.context.pending_extensions, doc.context.extensions, doc.context.new_Node);
     if (doc.context.has_extensions) extend(doc.root, doc.context.extensions, doc.context.new_Node);
     string output(doc.emit_css(static_cast<Document::CSS_Style>(style)));
@@ -74,7 +76,7 @@ extern "C" {
     }
     catch (Error& e) {
       stringstream msg_stream;
-      msg_stream << "ERROR -- " << e.path << ", line " << e.line << ": " << e.message << endl;
+      msg_stream << "ERROR -- " << e.path << ":" << e.line << ": " << e.message << endl;
       string msg(msg_stream.str());
       char* msg_str = (char*) malloc(msg.size() + 1);
       strcpy(msg_str, msg.c_str());
@@ -114,7 +116,7 @@ extern "C" {
     }
     catch (Error& e) {
       stringstream msg_stream;
-      msg_stream << "ERROR -- " << e.path << ", line " << e.line << ": " << e.message << endl;
+      msg_stream << "ERROR -- " << e.path << ":" << e.line << ": " << e.message << endl;
       string msg(msg_stream.str());
       char* msg_str = (char*) malloc(msg.size() + 1);
       strcpy(msg_str, msg.c_str());
