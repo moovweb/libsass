@@ -278,6 +278,25 @@ namespace Sass {
           return ss.str();
         }
       } break;
+
+      case ie_hex_str: {
+        stringstream ss;
+        ss << '#' << std::setw(2) << std::setfill('0') << std::hex;
+
+        double x = at(3).numeric_value() * 255;
+        if (x > 0xff) x = 0xff;
+        else if (x < 0) x = 0;
+        ss << std::hex << std::setw(2) << std::uppercase << static_cast<unsigned long>(std::floor(x+0.5));
+
+        for (size_t i = 0; i < 3; ++i) {
+          double x = at(i).numeric_value();
+          if (x > 0xff) x = 0xff;
+          else if (x < 0) x = 0;
+          ss << std::hex << std::setw(2) << std::uppercase << static_cast<unsigned long>(std::floor(x+0.5));
+        }
+
+        return ss.str();
+      } break;
       
       case uri: {
         string result("url(");
@@ -417,7 +436,7 @@ namespace Sass {
         if (block.has_blocks()) {
           for (size_t i = 0, S = block.size(); i < S; ++i) {
             if (block[i].type() == ruleset || block[i].type() == media_query) {
-              block[i].emit_nested_css(buf, depth, false, false, source_comments); // last arg should be in_media_query?
+              block[i].emit_nested_css(buf, depth, false, in_media_query, source_comments);
             }
           }
         }
@@ -702,27 +721,30 @@ namespace Sass {
         new_prefix += "\n";
         new_prefix += string(2*depth, ' ');
       }
-      new_prefix += at(0).token().to_string();
+      new_prefix += at(0).to_string();
     }
     else {
       new_prefix += "-";
-      new_prefix += at(0).token().to_string();
+      new_prefix += at(0).to_string();
       // has_prefix = true;
     }
     Node rules(at(1));
+    rules.flatten();
     for (size_t i = 0, S = rules.size(); i < S; ++i) {
       if (rules[i].type() == propset) {
         rules[i].emit_propset(buf, depth+1, new_prefix, compressed);
       }
-      else {
+      else if (rules[i].type() == rule) {
         buf << new_prefix;
-        if (rules[i][0].token().to_string() != "") buf << '-';
+        if (rules[i][0].to_string() != "") buf << '-';
         if (!compressed) {
           rules[i][0].emit_nested_css(buf, depth);
+          if (rules[i][0].type() == identifier_schema) buf << ": ";
           rules[i][1].emit_nested_css(buf, depth);
         }
         else {
           rules[i][0].emit_compressed_css(buf);
+          if (rules[i][0].type() == identifier_schema) buf << ": ";
           rules[i][1].emit_compressed_css(buf);
         }
         buf << ';';

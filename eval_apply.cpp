@@ -25,13 +25,13 @@ namespace Sass {
   }
 
   // Expansion function for nodes in an expansion context.
-  void expand(Node expr, Node prefix, Environment& env, map<string, Function>& f_env, Node_Factory& new_Node, Context& ctx, Backtrace& bt, bool function_name)
+  void expand(Node expr, Node prefix, Environment& env, map<string, Function>& f_env, Node_Factory& new_Node, Context& ctx, Backtrace& bt, bool function_name, const Node content)
   {
     switch (expr.type())
     {
       case Node::root: {
         for (size_t i = 0, S = expr.size(); i < S; ++i) {
-          expand(expr[i], prefix, env, f_env, new_Node, ctx, bt);
+          expand(expr[i], prefix, env, f_env, new_Node, ctx, bt, false, content);
         }
       } break;
 
@@ -46,17 +46,47 @@ namespace Sass {
       case Node::mixin_call: { // mixin invocation
         Token name(expr[0].token());
         Node args(expr[1]);
+        Node this_content = expr.size() == 3 ? expr[2] : Node();
+        if (!this_content.is_null()) expand(this_content, prefix, env, f_env, new_Node, ctx, bt, false, content);
         if (!env.query(name)) throw_eval_error(bt, "mixin " + name.to_string() + " is undefined", expr.path(), expr.line());
         Node mixin(env[name]);
         Backtrace here(&bt, expr.path(), expr.line(), ", in mixin '" + name.to_string() + "'");
-        Node expansion(apply_mixin(mixin, args, prefix, env, f_env, new_Node, ctx, here));
+        Node expansion(apply_mixin(mixin, args, this_content, prefix, env, f_env, new_Node, ctx, here));
         expr.pop_all();   // pop the mixin metadata
         expr += expansion; // push the expansion
       } break;
 
+      case Node::mixin_content: {
+        if (!content.is_null()) {
+          expr += new_Node(content);
+          for (size_t i = 0, S = expr.size(); i < S; ++i) {
+            re_expand(expr[i], prefix, env, f_env, new_Node, ctx, bt, false, content);
+          }
+        }
+      } break;
+
       case Node::propset: {
         // TO DO: perform the property expansion here, rather than in the emitter (also requires the parser to allow interpolants in the property names)
-        expand(expr[1], prefix, env, f_env, new_Node, ctx, bt);
+        expr[0] = eval(expr[0], prefix, env, f_env, new_Node, ctx, bt);
+        expand(expr[1], prefix, env, f_env, new_Node, ctx, bt, false, content);
+
+        // Node block(expr[1]);
+        // for (size_t i = 0, S = block.size(); i < S; ++i) {
+        //   Node stm(block[i]);
+        //   switch (stm.type())
+        //   {
+        //     case Node::propset:
+        //     case Node::mixin_call:
+        //     case Node::if_directive:
+        //     case Node::for_through_directive:
+        //     case Node::for_to_directive:
+        //     case Node::each_directive:
+        //     case Node::while_directive:
+        //     case Node::warning: {
+        //       expand(stm, prefix, env, f_env, new_Node, ctx, bt, false, content);
+        //     } break;
+        //   }
+        // }
       } break;
 
       case Node::ruleset: {
@@ -82,46 +112,14 @@ namespace Sass {
           expr[0] = needs_reparsing.parse_selector_group();
         }
 
-        // expand the selector with the prefix and save it in expr[2]
+        // Expand the selector with the prefix and save it in expr[2].
         expr << expand_selector(expr[0], prefix, new_Node);
 
-        // // gather selector extensions into a pending queue
-        // if (ctx.has_extensions) {
-        //   // check single selector
-        //   if (expr.back().type() != Node::selector_group) {
-        //     Node sel(selector_base(expr.back()));
-        //     if (ctx.extensions.count(sel)) {
-        //       for (multimap<Node, Node>::iterator i = ctx.extensions.lower_bound(sel); i != ctx.extensions.upper_bound(sel); ++i) {
-        //         ctx.pending_extensions.push_back(pair<Node, Node>(expr, i->second));
-        //       }
-        //     }
-        //   }
-        //   // individually check each selector in a group
-        //   else {
-        //     Node group(expr.back());
-        //     for (size_t i = 0, S = group.size(); i < S; ++i) {
-        //       Node sel(selector_base(group[i]));
-        //       if (ctx.extensions.count(sel)) {
-        //         for (multimap<Node, Node>::iterator j = ctx.extensions.lower_bound(sel); j != ctx.extensions.upper_bound(sel); ++j) {
-        //           ctx.pending_extensions.push_back(pair<Node, Node>(expr, j->second));
-        //         }
-        //       }
-        //     }
-        //   }
-        // }
-
-        // expand the body with the newly expanded selector as the prefix
-        // cerr << "ORIGINAL SELECTOR:\t" << expr[2].to_string() << endl;
-        // cerr << "NORMALIZED SELECTOR:\t" << normalize_selector(expr[2], new_Node).to_string() << endl << endl;
-        expand(expr[1], expr.back(), env, f_env, new_Node, ctx, bt);
+        expand(expr[1], expr.back(), env, f_env, new_Node, ctx, bt, false, content);
       } break;
 
       case Node::media_query: {
-        // Node block(expr[1]);
-        // Node new_ruleset(new_Node(Node::ruleset, expr.path(), expr.line(), 3));
-        // expr[1] = new_ruleset << prefix << block << prefix;
-        // expand(expr[1], new_Node(Node::none, expr.path(), expr.line(), 0), env, f_env, new_Node, ctx, bt);
-        expand(expr[1], prefix, env, f_env, new_Node, ctx, bt);
+        expand(expr[1], prefix, env, f_env, new_Node, ctx, bt, false, content);
         expr << prefix;
       } break;
 
@@ -129,7 +127,7 @@ namespace Sass {
         Environment new_frame;
         new_frame.link(env);
         for (size_t i = 0, S = expr.size(); i < S; ++i) {
-          expand(expr[i], prefix, new_frame, f_env, new_Node, ctx, bt);
+          expand(expr[i], prefix, new_frame, f_env, new_Node, ctx, bt, false, content);
         }
       } break;
       
@@ -171,6 +169,9 @@ namespace Sass {
         }
         else if (rhs.is_schema() || rhs.should_eval()) {
           expr[1] = eval(rhs, prefix, env, f_env, new_Node, ctx, bt);
+        }
+        if (expr[1].type() == Node::list && expr[1].empty()) {
+          throw_eval_error(bt, "the value of a style property may not be empty", expr[1].path(), expr[1].line());
         }
       } break;
 
@@ -233,12 +234,12 @@ namespace Sass {
           if (expr[i].type() != Node::block) {
             Node predicate_val(eval(expr[i], prefix, env, f_env, new_Node, ctx, bt));
             if (!predicate_val.is_false()) {
-              expand(expansion = expr[i+1], prefix, env, f_env, new_Node, ctx, bt);
+              expand(expansion = expr[i+1], prefix, env, f_env, new_Node, ctx, bt, false, content);
               break;
             }
           }
           else {
-            expand(expansion = expr[i], prefix, env, f_env, new_Node, ctx, bt);
+            expand(expansion = expr[i], prefix, env, f_env, new_Node, ctx, bt, false, content);
             break;
           }
         }
@@ -266,7 +267,7 @@ namespace Sass {
           Node i_node(new_Node(expr.path(), expr.line(), i));
           Node fake_arg(new_Node(Node::arguments, expr.path(), expr.line(), 1));
           fake_arg << i_node;
-          expr += apply_mixin(fake_mixin, fake_arg, prefix, env, f_env, new_Node, ctx, bt, true);
+          expr += apply_mixin(fake_mixin, fake_arg, content, prefix, env, f_env, new_Node, ctx, bt, true);
         }
       } break;
 
@@ -286,7 +287,7 @@ namespace Sass {
           Node fake_arg(new_Node(Node::arguments, expr.path(), expr.line(), 1));
           list[i].should_eval() = true;
           fake_arg << eval(list[i], prefix, env, f_env, new_Node, ctx, bt);
-          expr += apply_mixin(fake_mixin, fake_arg, prefix, env, f_env, new_Node, ctx, bt, true);
+          expr += apply_mixin(fake_mixin, fake_arg, content, prefix, env, f_env, new_Node, ctx, bt, true);
         }
       } break;
 
@@ -302,14 +303,14 @@ namespace Sass {
         expr.pop_back();
         Node ev_pred(eval(pred, prefix, env, f_env, new_Node, ctx, bt));
         while (!ev_pred.is_false()) {
-          expr += apply_mixin(fake_mixin, fake_arg, prefix, env, f_env, new_Node, ctx, bt, true);
+          expr += apply_mixin(fake_mixin, fake_arg, content, prefix, env, f_env, new_Node, ctx, bt, true);
           ev_pred = eval(pred, prefix, env, f_env, new_Node, ctx, bt);
         }
       } break;
 
       case Node::block_directive: {
         // TO DO: eval the directive name for interpolants
-        expand(expr[1], new_Node(Node::none, expr.path(), expr.line(), 0), env, f_env, new_Node, ctx, bt);
+        expand(expr[1], new_Node(Node::none, expr.path(), expr.line(), 0), env, f_env, new_Node, ctx, bt, false, content);
       } break;
 
       case Node::warning: {
@@ -322,8 +323,10 @@ namespace Sass {
           result = result.substr(1, result.size()-2); // unquote if it's a single string
         }
         // These cerrs aren't log lines! They're supposed to be here!
-        cerr << prefix << result << endl;
-        cerr << indent << "on line " << expr.line() << " of " << expr.path();
+        cerr << prefix << result;
+        // cerr << indent << "on line " << expr.line() << " of " << expr.path();
+        Backtrace top(&bt, expr.path(), expr.line(), "");
+        cerr << top.to_string(true);
         cerr << endl << endl;
       } break;
 
@@ -332,6 +335,44 @@ namespace Sass {
       } break;
 
     }
+  }
+
+  void re_expand(Node expr, Node prefix, Environment& env, map<string, Function>& f_env, Node_Factory& new_Node, Context& ctx, Backtrace& bt, bool function_name, const Node content)
+  {
+    switch (expr.type())
+    {
+      case Node::ruleset: {
+        expr[2] = expand_selector(expr[0], prefix, new_Node);
+        re_expand(expr[1], expr[2], env, f_env, new_Node, ctx, bt, false, content);
+      } break;
+
+      case Node::block:
+      case Node::mixin_call:
+      case Node::mixin_content:
+      case Node::if_directive:
+      case Node::for_through_directive:
+      case Node::for_to_directive:
+      case Node::each_directive:
+      case Node::while_directive: {
+        for (size_t i = 0, S = expr.size(); i < S; ++i) {
+          re_expand(expr[i], prefix, env, f_env, new_Node, ctx, bt, false, content);
+        }
+      } break;
+
+      case Node::media_query: {
+        expr[2] = prefix;
+        re_expand(expr[1], prefix, env, f_env, new_Node, ctx, bt, false, content);
+      } break;
+
+      case Node::block_directive: {
+        re_expand(expr[1], prefix, env, f_env, new_Node, ctx, bt, false, content);
+      } break;
+
+      default: {
+        return;
+      } break;
+    }
+    return;
   }
 
   void expand_list(Node list, Node prefix, Environment& env, map<string, Function>& f_env, Node_Factory& new_Node, Context& ctx, Backtrace& bt)
@@ -831,7 +872,7 @@ namespace Sass {
   // Apply a mixin -- bind the arguments in a new environment, link the new
   // environment to the current one, then copy the body and eval in the new
   // environment.
-  Node apply_mixin(Node mixin, const Node args, Node prefix, Environment& env, map<string, Function>& f_env, Node_Factory& new_Node, Context& ctx, Backtrace& bt, bool dynamic_scope)
+  Node apply_mixin(Node mixin, const Node args, const Node content, Node prefix, Environment& env, map<string, Function>& f_env, Node_Factory& new_Node, Context& ctx, Backtrace& bt, bool dynamic_scope)
   {
     Node params(mixin[1]);
     Node body(new_Node(mixin[2])); // clone the body
@@ -852,7 +893,7 @@ namespace Sass {
     if (!mixin[0].is_null()) mixin_name << " " << mixin[0].to_string();
     bind_arguments(mixin_name.str(), params, evaluated_args, prefix, bindings, f_env, new_Node, ctx, bt);
     // evaluate the mixin's body
-    expand(body, prefix, bindings, f_env, new_Node, ctx, bt);
+    expand(body, prefix, bindings, f_env, new_Node, ctx, bt, false, content);
     return body;
   }
 
@@ -992,8 +1033,10 @@ namespace Sass {
             result = result.substr(1, result.size()-2); // unquote if it's a single string
           }
           // These cerrs aren't log lines! They're supposed to be here!
-          cerr << prefix << result << endl;
-          cerr << indent << "on line " << stm.line() << " of " << stm.path();
+          cerr << prefix << result;
+          // cerr << indent << "on line " << stm.line() << " of " << stm.path();
+          Backtrace top(&bt, stm.path(), stm.line(), "");
+          cerr << top.to_string(true);
           cerr << endl << endl;
         } break;
 
