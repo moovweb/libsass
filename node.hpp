@@ -5,6 +5,7 @@
 #include <vector>
 #include <iostream>
 
+union Sass_Value;
 namespace Sass {
   using namespace std;
 
@@ -47,7 +48,7 @@ namespace Sass {
 
     string unquote() const;
     void   unquote_to_stream(std::stringstream& buf) const;
-    
+
     operator bool()
     { return begin && end && begin >= end; }
 
@@ -59,7 +60,7 @@ namespace Sass {
     double numeric;
     Token unit;
   };
-  
+
   struct Node_Impl;
 
   // Node type for representing SCSS expression nodes. Really just a handle.
@@ -80,6 +81,9 @@ namespace Sass {
       ruleset,
       propset,
       media_query,
+
+      keyframes,
+      keyframe,
 
       selector_group,
       selector,
@@ -123,6 +127,7 @@ namespace Sass {
       term,
       mul,
       div,
+      mod,
 
       factor,
       unary_plus,
@@ -204,6 +209,7 @@ namespace Sass {
     bool& is_splat() const;
 
     string& path() const;
+    string debug_info_path() const;
     size_t line() const;
     size_t size() const;
     bool empty() const;
@@ -235,7 +241,7 @@ namespace Sass {
     void flatten();
 
     string unquote() const;
-    
+
     bool operator==(Node rhs) const;
     bool operator!=(Node rhs) const;
     bool operator<(Node rhs) const;
@@ -244,14 +250,15 @@ namespace Sass {
     bool operator>=(Node rhs) const;
 
     string to_string(Type inside_of = none, const string space = " ", const bool in_media_feature = false) const;
-    void emit_nested_css(stringstream& buf, size_t depth, bool at_toplevel = false, bool in_media_query = false, bool source_comments = false);
+    void emit_nested_css(stringstream& buf, size_t depth, bool at_toplevel = false, bool in_media_query = false, int source_comments = false);
     void emit_propset(stringstream& buf, size_t depth, const string& prefix, const bool compressed = false);
     void echo(stringstream& buf, size_t depth = 0);
     void emit_expanded_css(stringstream& buf, const string& prefix);
     void emit_compressed_css(stringstream& buf);
 
+    Sass_Value to_c_val();
   };
-  
+
   // The actual implementation object for Nodes; Node handles point at these.
   struct Node_Impl {
     union value_t {
@@ -303,7 +310,7 @@ namespace Sass {
       is_arglist(false),
       is_splat(false)
     { }
-    
+
     bool is_numeric()
     { return type >= Node::number && type <= Node::numeric_dimension; }
 
@@ -348,7 +355,7 @@ namespace Sass {
 
     size_t size()
     { return children.size(); }
-    
+
     bool empty()
     { return children.empty(); }
 
@@ -373,12 +380,14 @@ namespace Sass {
         case Node::rule:
         case Node::propset:
         case Node::warning:
+        case Node::keyframe:
         case Node::block_directive:
         case Node::blockless_directive: {
           has_statements = true;
         } break;
 
         case Node::media_query:
+        case Node::keyframes:
         case Node::ruleset: {
           has_blocks = true;
         } break;
@@ -416,6 +425,7 @@ namespace Sass {
         case Node::propset:       has_statements = true; break;
 
         case Node::media_query:
+        case Node::keyframes:
         case Node::ruleset:       has_blocks     = true; break;
 
         case Node::if_directive:
@@ -441,7 +451,7 @@ namespace Sass {
 
     bool& boolean_value()
     { return value.boolean; }
-    
+
     double numeric_value();
     Token  unit();
   };
@@ -452,7 +462,7 @@ namespace Sass {
   // -- in the header file so they can easily be declared inline
   // -- outside of their class definition to get the right declaration order
   // ------------------------------------------------------------------------
-  
+
   inline Node::Node(Node_Impl* ip) : ip_(ip) { }
 
   inline Node::Type Node::type() const    { return ip_->type; }
@@ -476,12 +486,12 @@ namespace Sass {
   inline bool& Node::is_comma_separated() const { return ip_->is_comma_separated; }
   inline bool& Node::is_arglist() const    { return ip_->is_arglist; }
   inline bool& Node::is_splat() const      { return ip_->is_splat; }
-  
+
   inline string& Node::path() const  { return ip_->path; }
   inline size_t  Node::line() const  { return ip_->line; }
   inline size_t  Node::size() const  { return ip_->size(); }
   inline bool    Node::empty() const { return ip_->empty(); }
-  
+
   inline Node& Node::at(size_t i) const         { return ip_->at(i); }
   inline Node& Node::back() const               { return ip_->back(); }
   inline Node& Node::operator[](size_t i) const { return at(i); }
