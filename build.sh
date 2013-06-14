@@ -6,7 +6,7 @@ if [ -z $CLIBS_HOME ]; then
 fi
 [ ! -d $CLIBS_HOME ] && mkdir -p $CLIBS_HOME
 
-if [[ "x`uname`" == "xMINGW32_NT-6.1" ]]; then
+if [[ "x`uname`" == xMINGW32_NT* ]]; then
 	CLIBS_HOME=`echo "$CLIBS_HOME" | awk '{sub(/^C:/,"/c"); print}'`
 	CLIBS_HOME=`echo "$CLIBS_HOME" | awk '{gsub(/\\\/,"/"); print}'`
 fi
