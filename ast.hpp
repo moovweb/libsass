@@ -231,14 +231,14 @@ namespace Sass {
   ////////////////////////////////////////////////////////////////////////////
   class Import : public Statement {
     vector<string>         files_;
-    vector<Function_Call*> urls_;
+    vector<Expression*> urls_;
   public:
     Import(string p, size_t l)
     : Statement(p, l),
-      files_(vector<string>()), urls_(vector<Function_Call*>())
+      files_(vector<string>()), urls_(vector<Expression*>())
     { }
-    vector<string>&         files()   { return files_; }
-    vector<Function_Call*>& urls()    { return urls_; }
+    vector<string>&         files() { return files_; }
+    vector<Expression*>& urls()     { return urls_; }
     ATTACH_OPERATIONS();
   };
 
@@ -855,6 +855,8 @@ namespace Sass {
     string type() { return "null"; }
     static string type_name() { return "null"; }
     bool is_invisible() { return true; }
+    operator bool() { return false; }
+    bool is_false() { return true; }
     ATTACH_OPERATIONS();
   };
 

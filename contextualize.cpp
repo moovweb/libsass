@@ -59,10 +59,15 @@ namespace Sass {
 
   Selector* Contextualize::operator()(Selector_Combination* s)
   {
+    To_String to_string;
     Selector_Combination* ss = new (ctx.mem) Selector_Combination(*s);
-    if (ss->head()) ss->head(static_cast<Simple_Selector_Sequence*>(s->head()->perform(this)));
-    if (ss->tail()) ss->tail(static_cast<Selector_Combination*>(s->tail()->perform(this)));
-    if (!ss->head()) {
+    if (ss->head()) {
+      ss->head(static_cast<Simple_Selector_Sequence*>(s->head()->perform(this)));
+    }
+    if (ss->tail()) {
+      ss->tail(static_cast<Selector_Combination*>(s->tail()->perform(this)));
+    }
+    if (!ss->head() && ss->combinator() == Selector_Combination::ANCESTOR_OF) {
       return ss->tail();
     }
     else {

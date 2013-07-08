@@ -28,7 +28,7 @@ namespace Sass {
   };
 
   Eval::Eval(Context& ctx, Env* env, Backtrace* bt)
-  : ctx(ctx), env(env), force(force), backtrace(bt) { }
+  : ctx(ctx), env(env), backtrace(bt) { }
   Eval::~Eval() { }
 
   Eval* Eval::with(Env* e, Backtrace* bt) // for setting the env before eval'ing an expression
@@ -257,6 +257,7 @@ namespace Sass {
 
   Expression* Eval::operator()(Function_Call* c)
   {
+    if (c->name() == "calc") return c;
     Arguments* args = static_cast<Arguments*>(c->arguments()->perform(this));
     string full_name(c->name() + "[f]");
 
@@ -384,10 +385,14 @@ namespace Sass {
 
   Expression* Eval::operator()(Variable* v)
   {
+    // To_String to_string;
+    // cerr << "looking up " << v->name() << endl;
     string name(v->name());
     Expression* value = 0;
     if (env->has(name)) value = static_cast<Expression*>((*env)[name]);
     else error("unbound variable " + v->name(), v->path(), v->line());
+    // cerr << "fetched a value of type " << typeid(*value).name() << endl;
+    // if (value) cerr << "fetched a value: " << value->perform(&to_string) << endl;
     return value;
   }
 
@@ -448,16 +453,34 @@ namespace Sass {
     return b;
   }
 
+  char is_quoted(string str)
+  {
+    size_t len = str.length();
+    if (len < 2) return 0;
+    if ((str[0] == '"' && str[len-1] == '"') || (str[0] == '\'' && str[len-1] == '\'')) {
+      return str[0];
+    }
+    else {
+      return 0;
+    }
+  }
+
   Expression* Eval::operator()(String_Schema* s)
   {
     string acc;
     To_String to_string;
     for (size_t i = 0, L = s->length(); i < L; ++i) {
-      acc += unquote((*s)[i]->perform(this)->perform(&to_string));
+      string chunk((*s)[i]->perform(this)->perform(&to_string));
+      if ((s->quote_mark() && is_quoted(chunk)) || !s->quote_mark()) { // some redundancy in that test
+        acc += unquote(chunk);
+      }
+      else {
+        acc += chunk;
+      }
     }
     return new (ctx.mem) String_Constant(s->path(),
                                          s->line(),
-                                         quote(acc, s->quote_mark()));
+                                         acc);
   }
 
   Expression* Eval::operator()(String_Constant* s)

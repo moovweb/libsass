@@ -356,6 +356,8 @@ namespace Sass {
     const char* id_name(const char* src);
     // Match CSS class names.
     const char* class_name(const char* src);
+    // Match placeholder selectors.
+    const char* placeholder(const char* src);
     // Match CSS numeric constants.
     const char* sign(const char* src);
     const char* unsigned_number(const char* src);
@@ -412,6 +414,11 @@ namespace Sass {
     const char* lt_op(const char* src);
     const char* lte_op(const char* src);
 
+    // IE stuff
+    const char* ie_stuff(const char* src);
+    const char* ie_args(const char* src);
+    const char* ie_keyword_arg(const char* src);
+
     // Path matching functions.
     const char* folder(const char* src);
     const char* folders(const char* src);
@@ -449,7 +456,7 @@ namespace Sass {
       unsigned int counter = 0;
       while (beg < end && *beg) {
         const char* p;
-        if (p = mx(beg)) {
+        if ((p = mx(beg))) {
           ++counter;
           beg = p;
         }
