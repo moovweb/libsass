@@ -11,12 +11,8 @@ if [[ "x`uname`" == xMINGW32_NT* ]]; then
 	CLIBS_HOME=`echo "$CLIBS_HOME" | awk '{gsub(/\\\/,"/"); print}'`
 fi
 
-#make clean
-#git pull git://github.com/hcatlin/libsass.git
-#git push origin master
-#make install PREFIX=$CLIBS_HOME
 git checkout -f
-git pull git://github.com/hcatlin/libsass.git
+git pull git@github.com:hcatlin/libsass.git master
 
 ./configure --prefix=$CLIBS_HOME
 make install
