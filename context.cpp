@@ -139,7 +139,35 @@ namespace Sass {
     using namespace File;
     char* contents = 0;
     for (size_t i = 0, S = include_paths.size(); i < S; ++i) {
+      // cerr << endl << "importing " << path << " from path " << include_paths[i] << endl;
       string full_path(join_paths(include_paths[i], path));
+      if (style_sheets.count(full_path)) return full_path;
+      contents = resolve_and_load(full_path);
+      if (contents) {
+        sources.push_back(contents);
+        queue.push_back(make_pair(full_path, contents));
+        style_sheets[full_path] = 0;
+        return full_path;
+      }
+    }
+    return string();
+  }
+
+  string Context::add_file(string dir, string rel_filepath)
+  {
+    using namespace File;
+    char* contents = 0;
+    string full_path(join_paths(dir, rel_filepath));
+    if (style_sheets.count(full_path)) return full_path;
+    contents = resolve_and_load(full_path);
+    if (contents) {
+      sources.push_back(contents);
+      queue.push_back(make_pair(full_path, contents));
+      style_sheets[full_path] = 0;
+      return full_path;
+    }
+    for (size_t i = 0, S = include_paths.size(); i < S; ++i) {
+      string full_path(join_paths(include_paths[i], rel_filepath));
       if (style_sheets.count(full_path)) return full_path;
       contents = resolve_and_load(full_path);
       if (contents) {
@@ -179,7 +207,7 @@ namespace Sass {
 
     root = root->perform(&expand)->block();
     if (expand.extensions.size()) {
-      Extend extend(*this, expand.extensions);
+      Extend extend(*this, expand.extensions, &backtrace);
       root->perform(&extend);
     }
     char* result = 0;
@@ -191,7 +219,7 @@ namespace Sass {
       } break;
 
       default: {
-        Output_Nested output_nested(this);
+        Output_Nested output_nested(source_comments, this);
         root->perform(&output_nested);
         result = copy_c_str(output_nested.get_buffer().c_str());
       } break;
