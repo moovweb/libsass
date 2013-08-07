@@ -133,7 +133,8 @@ namespace Sass {
         }
         else {
           string current_dir = File::dir_name(path);
-          string resolved(ctx.add_file(File::join_paths(current_dir, unquote(import_path))));
+          // string resolved(ctx.add_file(File::join_paths(current_dir, unquote(import_path))));
+          string resolved(ctx.add_file(current_dir, unquote(import_path)));
           if (resolved.empty()) error("file to import not found or unreadable: " + import_path);
           imp->files().push_back(resolved);
         }
@@ -298,9 +299,10 @@ namespace Sass {
     else {
       sel = parse_selector_group();
     }
+    size_t r_line = line;
     if (!peek< exactly<'{'> >()) error("expected a '{' after the selector");
     Block* block = parse_block();
-    Ruleset* ruleset = new (ctx.mem) Ruleset(path, line, sel, block);
+    Ruleset* ruleset = new (ctx.mem) Ruleset(path, r_line, sel, block);
     return ruleset;
   }
 
@@ -442,7 +444,7 @@ namespace Sass {
       return new (ctx.mem) Selector_Placeholder(path, line, lexed);
     }
     else {
-      error("invalid selector after " + lexed);
+      error("invalid selector after " + lexed.to_string());
     }
     // unreachable statement
     return 0;
@@ -879,8 +881,14 @@ namespace Sass {
       }
       return kwd_arg;
     }
+    else if (peek< functional_schema >()) {
+      return parse_function_call_schema();
+    }
     else if (peek< identifier_schema >()) {
       return parse_identifier_schema();
+    }
+    else if (peek< functional >() && !peek< uri_prefix >()) {
+      return parse_function_call();
     }
     else if (lex< sequence< exactly<'+'>, spaces_and_comments, negate< number > > >()) {
       return new (ctx.mem) Unary_Expression(path, line, Unary_Expression::PLUS, parse_factor());
@@ -953,12 +961,6 @@ namespace Sass {
     if (lex< important >())
     { return new (ctx.mem) String_Constant(path, line, "!important"); }
 
-    if (peek< functional_schema >())
-    { return parse_function_call_schema(); }
-
-    if (peek< functional >())
-    { return parse_function_call(); }
-
     if (lex< value_schema >())
     { return Parser::from_token(lexed, ctx, path, line).parse_value_schema(); }
 
@@ -995,7 +997,7 @@ namespace Sass {
     if (lex< variable >())
     { return new (ctx.mem) Variable(path, line, lexed); }
 
-    error("error reading values after " + lexed);
+    error("error reading values after " + lexed.to_string());
 
     // unreachable statement
     return 0;
@@ -1032,7 +1034,7 @@ namespace Sass {
         }
         else {
           // throw an error if the interpolant is unterminated
-          error("unterminated interpolant inside string constant " + str);
+          error("unterminated interpolant inside string constant " + str.to_string());
         }
       }
       else { // no interpolants left; add the last segment if nonempty
@@ -1075,8 +1077,7 @@ namespace Sass {
         }
         else {
           // throw an error if the interpolant is unterminated
-          cerr << string(str) << endl;
-          error("unterminated interpolant inside IE function " + str);
+          error("unterminated interpolant inside IE function " + str.to_string());
         }
       }
       else { // no interpolants left; add the last segment if nonempty
@@ -1185,7 +1186,7 @@ namespace Sass {
         }
         else {
           // throw an error if the interpolant is unterminated
-          error("unterminated interpolant inside interpolated identifier " + id);
+          error("unterminated interpolant inside interpolated identifier " + id.to_string());
         }
       }
       else { // no interpolants left; add the last segment if nonempty
