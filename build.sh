@@ -11,6 +11,11 @@ if [[ "x`uname`" == xMINGW32_NT* ]]; then
 	CLIBS_HOME=`echo "$CLIBS_HOME" | awk '{gsub(/\\\/,"/"); print}'`
 fi
 
+if [[ "`uname`" == Darwin* ]]; then
+	export LIBTOOL=`which glibtool`
+	export LIBTOOLIZE=`which glibtoolize`
+fi
+
 git checkout -f
 git pull git@github.com:hcatlin/libsass.git master
 
