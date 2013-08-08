@@ -14,5 +14,6 @@ fi
 git checkout -f
 git pull git@github.com:hcatlin/libsass.git master
 
+autoreconf --install
 ./configure --prefix=$CLIBS_HOME
 make install
