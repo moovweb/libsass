@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -ex
 aclocal -I m4
 autoheader
