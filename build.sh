@@ -19,6 +19,6 @@ fi
 git checkout -f
 git pull git@github.com:hcatlin/libsass.git master
 
-./autogen.sh
+autoreconf -vfi
 ./configure --prefix=$CLIBS_HOME
 make install
