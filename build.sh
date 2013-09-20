@@ -19,6 +19,7 @@ fi
 git checkout -f
 git pull git@github.com:hcatlin/libsass.git master
 
-autoreconf -vfi
-./configure --prefix=$CLIBS_HOME
-make install
+autoreconf -vfi || exit 1
+./configure --prefix=$CLIBS_HOME || exit 1
+make || exit 1
+make install || exit 1
