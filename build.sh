@@ -7,8 +7,7 @@ fi
 [ ! -d $CLIBS_HOME ] && mkdir -p $CLIBS_HOME
 
 if [[ "x`uname`" == xMINGW32_NT* ]]; then
-	CLIBS_HOME=`echo "$CLIBS_HOME" | awk '{sub(/^C:/,"/c"); print}'`
-	CLIBS_HOME=`echo "$CLIBS_HOME" | awk '{gsub(/\\\/,"/"); print}'`
+	CLIBS_HOME=$(echo "$CLIBS_HOME" | sed 's/\\/\//g' | sed -r 's/(^[^\/]):/\/\1/')
 fi
 
 if [[ "`uname`" == Darwin* ]]; then
