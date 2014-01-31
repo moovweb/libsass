@@ -18,8 +18,8 @@ extern "C" {
 struct sass_options {
   int output_style;
   int source_comments; // really want a bool, but C doesn't have them
-  char* include_paths;
-  char* image_path;
+  const char* include_paths;
+  const char* image_path;
 };
 
 struct sass_context {
@@ -34,8 +34,11 @@ struct sass_context {
 };
 
 struct sass_file_context {
-  char* input_path;
+  const char* input_path;
+  const char* output_path;
   char* output_string;
+  char* source_map_string;
+  const char* source_map_file;
   struct sass_options options;
   int error_status;
   char* error_message;
@@ -45,8 +48,8 @@ struct sass_file_context {
 };
 
 struct sass_folder_context {
-  char* search_path;
-  char* output_path;
+  const char* search_path;
+  const char* output_path;
   struct sass_options options;
   int error_status;
   char* error_message;
