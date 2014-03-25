@@ -29,10 +29,12 @@ make || exit 1
 make install || exit 1
 
 # empty the dumping ground and re-copy all the latest clib outputs into it
+rm -rf "$CLIBS_HOME/bin"
 rm -rf "$CLIBS_HOME/include"
 rm -rf "$CLIBS_HOME/lib"
+rm -rf "$CLIBS_HOME/sbin"
+rm -rf "$CLIBS_HOME/share"
 for f in "$CLIBS_HOME/output/*/*"
 do
-  cp -R $f $CLIBS_HOME
   cp -R $f $CLIBS_HOME
 done
