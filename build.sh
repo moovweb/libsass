@@ -21,6 +21,7 @@ git pull git@github.com:hcatlin/libsass.git master
 autoreconf -vfi || exit 1
 
 # make an output folder just for this lib
+rm -rf "$CLIBS_HOME/output/libsass"
 mkdir -p "$CLIBS_HOME/output/libsass"
 
 ./configure --prefix="$CLIBS_HOME/output/libsass" || exit 1
