@@ -128,7 +128,7 @@ namespace Sass {
           extension = import_path.substr(import_path.length() - 5, 4);
         }
         if (extension == ".css") {
-          String_Constant* loc = new (ctx.mem) String_Constant(path, source_position, import_path);
+          String_Constant* loc = new (ctx.mem) String_Constant(path, source_position, import_path, true);
           Argument* loc_arg = new (ctx.mem) Argument(path, source_position, loc);
           Arguments* loc_args = new (ctx.mem) Arguments(path, source_position);
           (*loc_args) << loc_arg;
@@ -539,14 +539,24 @@ namespace Sass {
     Position p = source_position;
     if (!lex< attribute_name >()) error("invalid attribute name in attribute selector");
     string name(lexed);
-    if (lex< exactly<']'> >()) return new (ctx.mem) Attribute_Selector(path, p, name, "", "");
+    if (lex< exactly<']'> >()) return new (ctx.mem) Attribute_Selector(path, p, name, "", 0);
     if (!lex< alternatives< exact_match, class_match, dash_match,
                             prefix_match, suffix_match, substring_match > >()) {
       error("invalid operator in attribute selector for " + name);
     }
     string matcher(lexed);
-    if (!lex< string_constant >() && !lex< identifier >()) error("expected a string constant or identifier in attribute selector for " + name);
-    string value(lexed);
+
+    String* value = 0;
+    if (lex< identifier >()) {
+      value = new (ctx.mem) String_Constant(path, p, lexed, true);
+    }
+    else if (lex< string_constant >()) {
+      value = parse_interpolated_chunk(lexed);
+    }
+    else {
+      error("expected a string constant or identifier in attribute selector for " + name);
+    }
+
     if (!lex< exactly<']'> >()) error("unterminated attribute selector for " + name);
     return new (ctx.mem) Attribute_Selector(path, p, name, matcher, value);
   }
@@ -941,6 +951,9 @@ namespace Sass {
       // rparen, or if the attempt to parse an expression fails, then try to
       // munch a regular CSS url.
       try {
+        // special case -- if there's a comment, treat it as part of a URL
+        lex<spaces>();
+        if (peek<line_comment_prefix>() || peek<block_comment_prefix>()) error("comment in URL"); // doesn't really matter what we throw
         Expression* expr = parse_list();
         if (!lex< exactly<')'> >()) error("dangling expression in URL"); // doesn't really matter what we throw
         Argument* arg = new (ctx.mem) Argument(path, expr->position(), expr);
@@ -952,6 +965,7 @@ namespace Sass {
         position = here;
         source_position = here_p;
       }
+      lex< spaces >();
       if (lex< url >()) {
         String* the_url = parse_interpolated_chunk(lexed);
         Argument* arg = new (ctx.mem) Argument(path, the_url->position(), the_url);

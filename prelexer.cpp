@@ -23,10 +23,10 @@ namespace Sass {
 
     // Match a single character satisfying the ctype predicates.
     const char* space(const char* src) { return std::isspace(*src) ? src+1 : 0; }
-    const char* alpha(const char* src) { return std::isalpha(*src) ? src+1 : 0; }
+    const char* alpha(const char* src) { return std::isalpha(*src) || !isascii(*src) ? src+1 : 0; }
     const char* digit(const char* src) { return std::isdigit(*src) ? src+1 : 0; }
     const char* xdigit(const char* src) { return std::isxdigit(*src) ? src+1 : 0; }
-    const char* alnum(const char* src) { return std::isalnum(*src) ? src+1 : 0; }
+    const char* alnum(const char* src) { return std::isalnum(*src) || !isascii(*src) ? src+1 : 0; }
     const char* punct(const char* src) { return std::ispunct(*src) ? src+1 : 0; }
     // Match multiple ctype characters.
     const char* spaces(const char* src) { return one_plus<space>(src); }
@@ -37,13 +37,17 @@ namespace Sass {
     const char* puncts(const char* src) { return one_plus<punct>(src); }
 
     // Match a line comment.
-
     const char* line_comment(const char* src) { return to_endl<slash_slash>(src); }
+    // Match a line comment prefix.
+    const char* line_comment_prefix(const char* src) { return exactly<slash_slash>(src); }
+
+
     // Match a block comment.
-
-
     const char* block_comment(const char* src) {
       return sequence< optional_spaces, delimited_by<slash_star, star_slash, false> >(src);
+    }
+    const char* block_comment_prefix(const char* src) {
+      return exactly<slash_star>(src);
     }
     // Match either comment.
     const char* comment(const char* src) {
@@ -488,14 +492,14 @@ namespace Sass {
       return std::isxdigit(*src) ? src+1 : 0;
     }
 
-    const char* UNICODE(const char* src) {
+    const char* unicode(const char* src) {
       return sequence< exactly<'\\'>,
                        between<H, 1, 6>,
                        optional< class_char<url_space_chars> > >(src);
     }
 
     const char* ESCAPE(const char* src) {
-      return alternatives< UNICODE, class_char<escape_chars> >(src);
+      return alternatives< unicode, class_char<escape_chars> >(src);
     }
 
     const char* url(const char* src) {

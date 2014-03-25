@@ -99,6 +99,9 @@ namespace Sass {
       else if (mx == optional_spaces) {
         after_whitespace = optional_spaces(start);
       }
+      else if (mx == line_comment_prefix || mx == block_comment_prefix) {
+        after_whitespace = position;
+      }
       else {
         after_whitespace = spaces_and_comments(start);
       }
@@ -118,6 +121,9 @@ namespace Sass {
       if (mx == block_comment) {
         after_whitespace = // position;
           zero_plus< alternatives<spaces, line_comment> >(position);
+      }
+      else if (mx == url) {
+        after_whitespace = position;
       }
       else if (mx == ancestor_of || mx == no_spaces) {
         after_whitespace = position;
