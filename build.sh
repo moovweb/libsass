@@ -19,6 +19,19 @@ git checkout -f
 git pull git@github.com:hcatlin/libsass.git master
 
 autoreconf -vfi || exit 1
-./configure --prefix=$CLIBS_HOME || exit 1
+
+# make an output folder just for this lib
+mkdir -p "$CLIBS_HOME/output/libsass"
+
+./configure --prefix="$CLIBS_HOME/output/libsass" || exit 1
 make || exit 1
 make install || exit 1
+
+# empty the dumping ground and re-copy all the latest clib outputs into it
+rm -rf "$CLIBS_HOME/include"
+rm -rf "$CLIBS_HOME/lib"
+for f in "$CLIBS_HOME/output/*/*"
+do
+  cp -R $f $CLIBS_HOME
+  cp -R $f $CLIBS_HOME
+done
