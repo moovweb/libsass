@@ -1,5 +1,17 @@
 #!/bin/bash
-[ -z $CLIBS_HOME ] && [ ! -z $MOOV_HOME ] && export CLIBS_HOME="$MOOV_HOME/clibs"
+export OS_NAME=`uname`
+if [ `uname -m` == "x86_64" ]; then
+  export ARCH=amd64
+else
+  export ARCH=i386
+fi
+
+if [[ $1 == "jenkins" ]]; then
+  export CLIBS_HOME="$HOME/userContent/clibs/$OS_NAME-$ARCH"
+else
+  [ -z $CLIBS_HOME ] && [ ! -z $MOOV_HOME ] && export CLIBS_HOME=$MOOV_HOME/clibs
+fi
+
 if [ -z $CLIBS_HOME ]; then
 	echo "Please set CLIBS_HOME or MOOV_HOME before running this script."
 	exit 1
