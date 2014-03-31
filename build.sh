@@ -1,5 +1,12 @@
 #!/bin/bash
-export OS_NAME=`uname`
+
+# Provide a all lowercased OS name for everyone that sources us.
+if [[ "x`uname`" == "xMINGW32_NT-6.1" ]]; then
+  export OS_NAME="windows"
+else
+  export OS_NAME=`uname | tr '[:upper:]' '[:lower:]'`
+fi
+
 if [ `uname -m` == "x86_64" ]; then
   export ARCH=amd64
 else
