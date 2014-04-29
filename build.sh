@@ -34,8 +34,8 @@ if [[ "`uname`" == Darwin* ]]; then
 	export LIBTOOLIZE=`which glibtoolize`
 fi
 
-git checkout -f
-git pull git@github.com:hcatlin/libsass.git master
+# git checkout -f
+# git pull git@github.com:hcatlin/libsass.git master
 
 autoreconf -vfi || exit 1
 
