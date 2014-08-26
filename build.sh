@@ -37,6 +37,10 @@ fi
 # git checkout -f
 # git pull git@github.com:hcatlin/libsass.git master
 
+# submodule setup for sass2scss support
+git submodule init
+git submodule update 
+
 autoreconf -vfi || exit 1
 
 # make an output folder just for this lib
