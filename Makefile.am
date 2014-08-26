@@ -38,6 +38,8 @@ libsass_la_LDFLAGS = -no-undefined -version-info 0:0:0
 
 include_HEADERS = sass_interface.h sass.h
 
+nobase_include_HEADERS= sass2scss/sass2scss.h
+
 if ENABLE_TESTS
 
 noinst_PROGRAMS = sass-tester
