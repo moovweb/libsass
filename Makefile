@@ -1,5 +1,5 @@
 CXX      ?= g++
-CXXFLAGS = -Wall -O2 -fPIC -g
+CXXFLAGS = -Wall -O2 -fPIC
 LDFLAGS  = -fPIC
 
 PREFIX    = /usr/local
@@ -8,6 +8,7 @@ LIBDIR    = $(PREFIX)/lib
 SASS_SASSC_PATH ?= sassc
 SASS_SPEC_PATH ?= sass-spec
 SASSC_BIN = $(SASS_SASSC_PATH)/bin/sassc
+RUBY_BIN = ruby
 
 SOURCES = \
 	ast.cpp \
@@ -31,10 +32,13 @@ SOURCES = \
 	prelexer.cpp \
 	sass.cpp \
 	sass_interface.cpp \
+	sass2scss/sass2scss.cpp \
 	source_map.cpp \
 	to_c.cpp \
 	to_string.cpp \
-	units.cpp
+	units.cpp \
+	utf8_string.cpp \
+	util.cpp
 
 OBJECTS = $(SOURCES:.cpp=.o)
 
@@ -59,25 +63,27 @@ libsass.so: $(OBJECTS)
 	$(CXX) $(CXXFLAGS) -o $@ $+ $(LDFLAGS)
 
 install: libsass.a
-	install -Dpm0755 $< $(DESTDIR)$(LIBDIR)/$<
+	mkdir -p $(DESTDIR)$(LIBDIR)/
+	install -pm0755 $< $(DESTDIR)$(LIBDIR)/$<
 
 install-shared: libsass.so
-	install -Dpm0755 $< $(DESTDIR)$(LIBDIR)/$<
+	mkdir -p $(DESTDIR)$(LIBDIR)/
+	install -pm0755 $< $(DESTDIR)$(LIBDIR)/$<
 
 $(SASSC_BIN): libsass.a
-	cd $(SASS_SASSC_PATH) && make
+	cd $(SASS_SASSC_PATH) && $(MAKE)
 
 test: $(SASSC_BIN) libsass.a
-	ruby $(SASS_SPEC_PATH)/sass-spec.rb -c $(SASSC_BIN) -s $(LOG_FLAGS) $(SASS_SPEC_PATH)
+	$(RUBY_BIN) $(SASS_SPEC_PATH)/sass-spec.rb -c $(SASSC_BIN) -s $(LOG_FLAGS) $(SASS_SPEC_PATH)
 
 test_build: $(SASSC_BIN) libsass.a
-	ruby $(SASS_SPEC_PATH)/sass-spec.rb -c $(SASSC_BIN) -s --ignore-todo $(LOG_FLAGS) $(SASS_SPEC_PATH)
+	$(RUBY_BIN) $(SASS_SPEC_PATH)/sass-spec.rb -c $(SASSC_BIN) -s --ignore-todo $(LOG_FLAGS) $(SASS_SPEC_PATH)
 
 test_issues: $(SASSC_BIN) libsass.a
-	ruby $(SASS_SPEC_PATH)/sass-spec.rb -c $(SASSC_BIN) $(LOG_FLAGS) $(SASS_SPEC_PATH)/spec/issues
+	$(RUBY_BIN) $(SASS_SPEC_PATH)/sass-spec.rb -c $(SASSC_BIN) $(LOG_FLAGS) $(SASS_SPEC_PATH)/spec/issues
 
 clean:
-	rm -f $(OBJECTS) *.a *.so
+	rm -f $(OBJECTS) *.a *.so libsass.js
 
 
 .PHONY: all static shared bin install install-shared clean
