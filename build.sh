@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Provide a all lowercased OS name for everyone that sources us.
-if [[ "x`uname`" == "xMINGW32_NT-6.1" ]]; then
+if [[ "x`uname`" == xMINGW32_NT* ]]; then
   export OS_NAME="windows"
 else
   export OS_NAME=`uname | tr '[:upper:]' '[:lower:]'`
