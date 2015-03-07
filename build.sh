@@ -62,4 +62,7 @@ for f in "$CLIBS_HOME/output/*/*"
 do
   echo "Moving $f to $CLIBS_HOME"
   cp -R $f $CLIBS_HOME
+  if [[ "x`uname`" == xMINGW32_NT* ]]; then
+    cp $CLIBS_HOME/output/*/bin/*.dll "$CLIBS_HOME/lib"
+  fi
 done
