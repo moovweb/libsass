@@ -52,3 +52,6 @@ support/libsass.pc
 # Cloned testing dirs
 sassc/
 sass-spec/
+
+compile
+config.h.in~
